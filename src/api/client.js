@@ -3,11 +3,11 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`
   const config = {
+    ...options,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       ...options.headers,
     },
-    ...options,
   }
 
   const response = await fetch(url, config)
@@ -19,7 +19,8 @@ async function request(path, options = {}) {
 
   const contentType = response.headers.get('content-type')
   if (contentType && contentType.includes('application/json')) {
-    return response.json()
+    const json = await response.json()
+    return json && typeof json === 'object' && 'data' in json ? json.data : json
   }
 
   return response.text()

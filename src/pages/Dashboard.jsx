@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getUserTasks } from '../api/users'
-import TaskList from '../components/TaskList'
-
-const USER_IDS = [1]
+import { getUsers, getUserTasks } from '../api/users'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ users: 0, tasks: 0, byStatus: {} })
@@ -10,14 +7,15 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function fetchStats() {
       try {
-        let totalTasks = 0
+        const users = await getUsers()
         const byStatus = {}
+        let totalTasks = 0
 
-        const results = await Promise.allSettled(USER_IDS.map((id) => getUserTasks(id)))
-
-        const usersWithData = results.filter((r) => r.status === 'fulfilled').length
+        const results = await Promise.allSettled(users.map((u) => getUserTasks(u.user_id)))
 
         results.forEach((result) => {
           if (result.status === 'fulfilled' && result.value?.tasks) {
@@ -29,19 +27,20 @@ export default function Dashboard() {
           }
         })
 
-        setStats({
-          users: usersWithData,
-          tasks: totalTasks,
-          byStatus,
-        })
+        if (!cancelled) {
+          setStats({ users: users.length, tasks: totalTasks, byStatus })
+        }
       } catch (err) {
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchStats()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (loading) return <div className="loading">Loading...</div>
@@ -69,7 +68,7 @@ export default function Dashboard() {
         </div>
         {Object.entries(stats.byStatus).map(([status, count]) => (
           <div key={status} className="stat-card">
-            <h3>{statusLabels[status]}</h3>
+            <h3>{statusLabels[status] || `Status ${status}`}</h3>
             <p className="stat-value">{count}</p>
           </div>
         ))}

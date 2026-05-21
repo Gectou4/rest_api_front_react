@@ -1,5 +1,9 @@
 import request from './client'
 
+export function getUsers() {
+  return request('/users')
+}
+
 export function getUser(id) {
   return request(`/user/${id}`)
 }

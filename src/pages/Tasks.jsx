@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import { getUserTasks } from '../api/users'
+import { getUsers, getUserTasks } from '../api/users'
 import { createTask, updateTask, deleteTask } from '../api/tasks'
 import TaskList from '../components/TaskList'
 import TaskForm from '../components/TaskForm'
 import Modal from '../components/Modal'
 
-const DEFAULT_USER_ID = 1
-
 export default function Tasks() {
+  const [users, setUsers] = useState([])
+  const [selectedUserId, setSelectedUserId] = useState(null)
   const [tasks, setTasks] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -17,31 +17,53 @@ export default function Tasks() {
   const [formError, setFormError] = useState(null)
   const [filterStatus, setFilterStatus] = useState('all')
 
-  async function loadData() {
-    try {
-      const data = await getUserTasks(DEFAULT_USER_ID)
-      setTasks(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let cancelled = false
+    getUsers()
+      .then((list) => {
+        if (!cancelled) {
+          setUsers(list)
+          if (list.length > 0) setSelectedUserId(list[0].user_id)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
     }
-  }
+  }, [])
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (selectedUserId === null) return
+
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    getUserTasks(selectedUserId)
+      .then((data) => {
+        if (!cancelled) setTasks(data)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedUserId])
 
   async function handleCreateTask(data) {
     setFormError(null)
     try {
       const newTask = await createTask(data)
       setShowCreateModal(false)
-      await loadData()
-      return newTask
+      const tasksData = await getUserTasks(selectedUserId)
+      setTasks(tasksData)
     } catch (err) {
       setFormError(err.message)
-      throw err
     }
   }
 
@@ -51,7 +73,8 @@ export default function Tasks() {
       await updateTask(editingTask.task_id, data)
       setShowEditModal(false)
       setEditingTask(null)
-      await loadData()
+      const tasksData = await getUserTasks(selectedUserId)
+      setTasks(tasksData)
     } catch (err) {
       setFormError(err.message)
     }
@@ -61,7 +84,8 @@ export default function Tasks() {
     if (!confirm('Delete this task?')) return
     try {
       await deleteTask(taskId)
-      await loadData()
+      const tasksData = await getUserTasks(selectedUserId)
+      setTasks(tasksData)
     } catch (err) {
       setError(err.message)
     }
@@ -74,7 +98,7 @@ export default function Tasks() {
     )
   }
 
-  if (loading) return <div className="loading">Loading...</div>
+  const activeUser = users.find((u) => u.user_id === selectedUserId) || null
 
   return (
     <div className="page">
@@ -94,7 +118,20 @@ export default function Tasks() {
       {error && <div className="error">Error: {error}</div>}
 
       <div className="filter-bar">
-        <label htmlFor="status-filter">Filter by status:</label>
+        <label htmlFor="user-select">User:</label>
+        <select
+          id="user-select"
+          value={selectedUserId ?? ''}
+          onChange={(e) => setSelectedUserId(Number(e.target.value))}
+        >
+          {users.map((u) => (
+            <option key={u.user_id} value={u.user_id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="status-filter">Status:</label>
         <select
           id="status-filter"
           value={filterStatus}
@@ -109,15 +146,19 @@ export default function Tasks() {
         </select>
       </div>
 
-      <TaskList
-        tasks={filteredTasks}
-        onEdit={(task) => {
-          setEditingTask(task)
-          setFormError(null)
-          setShowEditModal(true)
-        }}
-        onDelete={handleDeleteTask}
-      />
+      {!activeUser && !loading && <p className="text-muted">No users found.</p>}
+      {loading && <div className="loading">Loading tasks...</div>}
+      {!loading && activeUser && (
+        <TaskList
+          tasks={filteredTasks}
+          onEdit={(task) => {
+            setEditingTask(task)
+            setFormError(null)
+            setShowEditModal(true)
+          }}
+          onDelete={handleDeleteTask}
+        />
+      )}
 
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create Task">
         {formError && <p className="error">{formError}</p>}
