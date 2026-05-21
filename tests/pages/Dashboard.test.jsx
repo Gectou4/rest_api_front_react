@@ -4,6 +4,7 @@ import Dashboard from '../../src/pages/Dashboard'
 import * as usersApi from '../../src/api/users'
 
 vi.mock('../../src/api/users', () => ({
+  getUsers: vi.fn(),
   getUserTasks: vi.fn(),
 }))
 
@@ -13,12 +14,15 @@ describe('Dashboard', () => {
   })
 
   it('renders loading state initially', () => {
-    usersApi.getUserTasks.mockReturnValue(new Promise(() => {}))
+    usersApi.getUsers.mockReturnValue(new Promise(() => {}))
     render(<Dashboard />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
 
   it('renders stats when data loads', async () => {
+    usersApi.getUsers.mockResolvedValue([
+      { user_id: 1, name: 'Alice', email: 'alice@test.com' },
+    ])
     usersApi.getUserTasks.mockResolvedValue({
       user_id: 1,
       tasks: {

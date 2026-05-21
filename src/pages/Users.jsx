@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getUser } from '../api/users'
-
-const DEFAULT_USERS = [1]
+import { getUsers, getUser } from '../api/users'
 
 export default function Users() {
+  const [users, setUsers] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [lookupId, setLookupId] = useState('')
   const [lookupResult, setLookupResult] = useState(null)
   const [lookupError, setLookupError] = useState(null)
+
+  useEffect(() => {
+    getUsers()
+      .then(setUsers)
+      .catch(setError)
+      .finally(() => setLoading(false))
+  }, [])
 
   async function handleLookup(e) {
     e.preventDefault()
@@ -20,6 +28,9 @@ export default function Users() {
       setLookupError(err.message)
     }
   }
+
+  if (loading) return <div className="loading">Loading users...</div>
+  if (error) return <div className="error">Error: {error}</div>
 
   return (
     <div className="page">
@@ -50,7 +61,7 @@ export default function Users() {
         )}
       </form>
 
-      <h2>Known Users</h2>
+      <h2>All Users</h2>
       <table className="table">
         <thead>
           <tr>
@@ -61,14 +72,13 @@ export default function Users() {
           </tr>
         </thead>
         <tbody>
-          {DEFAULT_USERS.map((userId) => (
-            <tr key={userId}>
-              <td>{userId}</td>
-              <td colSpan="2">
-                <Link to={`/users/${userId}`}>View user #{userId}</Link>
-              </td>
+          {users.map((user) => (
+            <tr key={user.user_id}>
+              <td>{user.user_id}</td>
+              <td>{user.name}</td>
+              <td>{user.email}</td>
               <td>
-                <Link to={`/users/${userId}`} className="btn btn-sm">
+                <Link to={`/users/${user.user_id}`} className="btn btn-sm">
                   View tasks
                 </Link>
               </td>
